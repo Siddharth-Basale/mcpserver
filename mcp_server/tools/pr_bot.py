@@ -17,6 +17,7 @@ async def open_autofix_pr(
     fix_proposal: CodeFixProposal,
     notes_path: str = "AUTOFIX_NOTES.md",
     attempt_logs: list[dict[str, Any]] | None = None,
+    indexing_debug: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     branch_name = f"agentic/autofix-{base_sha[:7]}"
     try:
@@ -33,7 +34,7 @@ async def open_autofix_pr(
         repository=repository,
         path=notes_path,
         branch=branch_name,
-        content=_build_notes_content(fix_proposal, attempt_logs or []),
+        content=_build_notes_content(fix_proposal, attempt_logs or [], indexing_debug=indexing_debug),
         message=fix_proposal.title,
     )
 
@@ -55,7 +56,12 @@ async def open_autofix_pr(
     )
 
 
-def _build_notes_content(fix_proposal: CodeFixProposal, attempt_logs: list[dict[str, Any]]) -> str:
+def _build_notes_content(
+    fix_proposal: CodeFixProposal,
+    attempt_logs: list[dict[str, Any]],
+    *,
+    indexing_debug: dict[str, Any] | None = None,
+) -> str:
     attempts = "\n".join(
         f"- attempt {a.get('attempt')}: {a.get('status')} - {a.get('message')}"
         for a in attempt_logs
@@ -63,11 +69,26 @@ def _build_notes_content(fix_proposal: CodeFixProposal, attempt_logs: list[dict[
     if not fix_proposal.file_changes:
         return f"# Autofix Notes\n\n{fix_proposal.description}\n\n## Attempts\n{attempts}\n"
     changed = "\n".join(f"- {fc.path}" for fc in fix_proposal.file_changes)
+
+    indexing_lines: list[str] = []
+    if indexing_debug and indexing_debug.get("enabled"):
+        indexing_lines = [
+            "## Indexing",
+            f"- token_count: {indexing_debug.get('token_count')}",
+            f"- max_query_tokens: {indexing_debug.get('max_query_tokens')}",
+            f"- skip_symbol_decision: {indexing_debug.get('skip_symbol_decision')}",
+            f"- fallback_used: {indexing_debug.get('fallback_used')}",
+            f"- final_skip_symbol: {indexing_debug.get('final_skip_symbol')}",
+            f"- results_count: {indexing_debug.get('results_count')}",
+        ]
+
+    indexing_block = ("\n".join(indexing_lines) + "\n\n" if indexing_lines else "")
     return (
         "# Autofix Notes\n\n"
         f"## Summary\n{fix_proposal.description}\n\n"
         f"## Attempts\n{attempts}\n\n"
-        "## Files updated\n"
-        f"{changed}\n"
+        + indexing_block
+        + "## Files updated\n"
+        + f"{changed}\n"
     )
 

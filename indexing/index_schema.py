@@ -11,7 +11,16 @@ from typing import Any, Iterable
 INDEX_VERSION = "1.0.0"
 DEFAULT_INDEX_DIR_NAME = ".code_index"
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-SUPPORTED_EXTENSIONS = {".kt", ".java", ".xml"}
+SUPPORTED_EXTENSIONS = {
+    ".kt",
+    ".java",
+    ".xml",
+    ".py",
+    ".txt",
+    ".md",
+    ".yml",
+    ".yaml",
+}
 IGNORED_DIRS = {
     ".git",
     ".gradle",

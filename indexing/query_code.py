@@ -20,6 +20,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lexical-k", type=int, default=20)
     parser.add_argument("--symbol-k", type=int, default=20)
     parser.add_argument("--semantic-k", type=int, default=20)
+    parser.add_argument(
+        "--skip-symbol",
+        action="store_true",
+        help="Skip symbol-based retrieval (prevents overly complex SQL in symbol_retrieval).",
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON output.")
     parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING_MODEL)
     return parser.parse_args()
@@ -237,7 +242,7 @@ def main() -> int:
     embedding_model = config.get("embedding_model", args.embedding_model)
 
     lexical_hits = lexical_retrieval(db_path, args.query, args.lexical_k)
-    symbol_hits = symbol_retrieval(db_path, args.query, args.symbol_k)
+    symbol_hits = [] if args.skip_symbol else symbol_retrieval(db_path, args.query, args.symbol_k)
     semantic_hits = semantic_retrieval(
         db_path=db_path,
         index_paths=index_paths,

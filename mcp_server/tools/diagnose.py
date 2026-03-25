@@ -24,6 +24,7 @@ Rules:
 - Only include files that already exist in provided file contents.
 - Keep patch minimal and focused on fixing failing tests/build.
 - Do not include markdown fences.
+- Prefer using the relevant line-grounded context below when selecting exact lines for patch hunks.
 """
 
 
@@ -84,6 +85,7 @@ async def generate_patch_with_llm(
     context: PipelineContext,
     diagnosis: DiagnosisResult,
     file_contents: dict[str, str],
+    retrieval_context: str,
     previous_attempt_feedback: str = "",
 ) -> PatchGenerationResult:
     files_blob = "\n\n".join(
@@ -106,6 +108,7 @@ async def generate_patch_with_llm(
                             f"Root cause: {diagnosis.root_cause}\n"
                             f"Proposed fix: {diagnosis.proposed_fix}\n"
                             f"Failing tests: {context.failing_tests}\n"
+                            f"Relevant indexed code context:\n{retrieval_context}\n\n"
                             f"Attempt feedback: {previous_attempt_feedback}\n"
                             f"Logs excerpt:\n{context.logs_excerpt}\n\n"
                             f"Available files (edit only these):\n{files_blob}\n"

@@ -8,6 +8,7 @@ from mcp_server.config import get_settings
 from mcp_server.tools.diagnose import diagnose_failure, generate_patch_with_llm
 from mcp_server.tools.fix_generator import build_fix_proposal_from_patch
 from mcp_server.tools.github_client import GitHubClient
+from mcp_server.tools.code_indexing import build_and_query
 from mcp_server.tools.logs_analyzer import (
     extract_failing_tests,
     extract_python_file_candidates,
@@ -109,8 +110,29 @@ async def orchestrate_autofix(
         if content:
             file_contents[path] = content
 
+    retrieval_context = "Indexing disabled."
+    retrieval_snippet_count = 0
+    if settings.INDEXING_ENABLED:
+        query_text = (
+            f"Failure summary: {diagnosis_model.summary}\n"
+            f"Root cause: {diagnosis_model.root_cause}\n"
+            f"Failing tests: {context.failing_tests}\n"
+            f"Logs excerpt:\n{context.logs_excerpt[:4000]}"
+        )
+        retrieval_context, retrieval_snippet_count, indexing_debug = build_and_query(
+            file_contents=file_contents,
+            query_text=query_text,
+            rebuild=settings.INDEXING_REBUILD,
+            top_k=settings.INDEXING_TOP_K,
+            max_query_chars=settings.INDEXING_MAX_QUERY_CHARS,
+            max_query_tokens=settings.INDEXING_MAX_QUERY_TOKENS,
+            skip_symbol_token_threshold=settings.INDEXING_SKIP_SYMBOL_TOKEN_THRESHOLD,
+        )
+    else:
+        indexing_debug = {"enabled": False}
+
     attempt_logs: list[RepairAttempt] = []
-    feedback = ""
+    feedback = f"Indexing enabled={settings.INDEXING_ENABLED}; retrieved_snippets={retrieval_snippet_count}."
     fix_proposal = None
     for attempt in range(1, settings.MAX_REPAIR_ATTEMPTS + 1):
         try:
@@ -119,6 +141,7 @@ async def orchestrate_autofix(
                 context=context,
                 diagnosis=diagnosis_model,
                 file_contents=file_contents,
+                retrieval_context=retrieval_context,
                 previous_attempt_feedback=feedback,
             )
             attempt_logs.append(
@@ -172,8 +195,15 @@ async def orchestrate_autofix(
         fix_proposal=fix_proposal,
         notes_path=f".agentic/notes/autofix-{context.run_id}.md",
         attempt_logs=[a.model_dump() for a in attempt_logs],
+        indexing_debug=indexing_debug,
     )
-    return {"status": "fixed", "pull_request": pr, "analysis": analysis, "attempts": [a.model_dump() for a in attempt_logs]}
+    return {
+        "status": "fixed",
+        "pull_request": pr,
+        "analysis": analysis,
+        "indexing_debug": indexing_debug,
+        "attempts": [a.model_dump() for a in attempt_logs],
+    }
 
 
 if __name__ == "__main__":
