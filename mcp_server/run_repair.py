@@ -11,6 +11,37 @@ from mcp_server.main import orchestrate_autofix
 from mcp_server.tools.github_client import GitHubClient
 
 
+def _compact_output(result: dict) -> dict:
+    pr = result.get("pull_request") or {}
+    analysis = result.get("analysis") or {}
+    diagnosis = analysis.get("diagnosis") or {}
+    governance = analysis.get("governance") or {}
+    context = analysis.get("context") or {}
+    attempts = result.get("attempts") or []
+
+    return {
+        "status": result.get("status"),
+        "repository": context.get("repository"),
+        "run_id": context.get("run_id"),
+        "pull_request": {
+            "number": pr.get("number"),
+            "html_url": pr.get("html_url"),
+            "branch": ((pr.get("head") or {}).get("ref") if isinstance(pr, dict) else None),
+        },
+        "diagnosis": {
+            "summary": diagnosis.get("summary"),
+            "root_cause": diagnosis.get("root_cause"),
+            "risk_score": diagnosis.get("risk_score"),
+        },
+        "governance": {
+            "decision": governance.get("decision"),
+            "rationale": governance.get("rationale"),
+        },
+        "indexing_debug": result.get("indexing_debug"),
+        "attempts": attempts,
+    }
+
+
 async def _main() -> int:
     load_dotenv()
     repository = os.getenv("REPOSITORY", "").strip()
@@ -41,7 +72,7 @@ async def _main() -> int:
         print(f"Using latest failed run id: {run_id}")
 
     result = await orchestrate_autofix(repository=repository, run_id=run_id, base_branch=base_branch)
-    print(json.dumps(result, indent=2))
+    print(json.dumps(_compact_output(result), indent=2))
     return 0
 
 

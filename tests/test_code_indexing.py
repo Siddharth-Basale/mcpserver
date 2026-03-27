@@ -65,3 +65,24 @@ def test_sanitize_query_text_caps_tokens_and_chars():
     # (We don't test the SQL path here; we validate token counting plumbing.)
     _, token_count_2 = sanitize_query_text(raw, max_chars=300, max_tokens=40)
     assert token_count_2 <= 40
+
+
+def test_sanitize_query_text_deduplicates_tokens_preserving_order():
+    raw = "failure failure summary summary root root cause cause syntax syntax"
+    safe, token_count = sanitize_query_text(raw, max_chars=500, max_tokens=20)
+    assert safe == "failure summary root cause syntax"
+    assert token_count == 5
+
+
+def test_build_and_query_indexes_unknown_extension():
+    # Unknown extension should still be indexed and retrievable.
+    file_contents = {"notes.customext": "alphaBetaToken\nanotherLine\n"}
+    rendered, n, debug = build_and_query(
+        file_contents=file_contents,
+        query_text="alphaBetaToken",
+        rebuild=True,
+        top_k=3,
+    )
+    assert debug.get("enabled") is True
+    assert n >= 1
+    assert "notes.customext" in rendered

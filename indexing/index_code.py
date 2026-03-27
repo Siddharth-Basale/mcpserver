@@ -18,7 +18,6 @@ from index_schema import (
     IGNORED_DIRS,
     INDEX_VERSION,
     MAX_FILE_SIZE_BYTES,
-    SUPPORTED_EXTENSIONS,
     ChunkRecord,
     FileRecord,
     SymbolRecord,
@@ -62,8 +61,6 @@ def collect_files(target_folder: Path) -> list[Path]:
         root_path = Path(root)
         for name in files:
             file_path = root_path / name
-            if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-                continue
             try:
                 if file_path.stat().st_size > MAX_FILE_SIZE_BYTES:
                     continue
@@ -528,7 +525,7 @@ def main() -> int:
         "chunks_indexed": len(all_chunks),
         "semantic_enabled": not warning_msgs,
         "embedding_model": args.embedding_model,
-        "supported_extensions": sorted(SUPPORTED_EXTENSIONS),
+        "supported_extensions": "ALL",
     }
     write_config(index_paths["config_path"], current_config)
 

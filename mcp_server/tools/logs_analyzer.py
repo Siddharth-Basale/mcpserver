@@ -36,8 +36,32 @@ def extract_python_file_candidates(items: list[str]) -> list[str]:
     for item in items:
         normalized = item.replace("\\", "/")
         for token in normalized.replace(":", " ").split():
-            token = token.strip(" ,.;:()[]{}'\"")
+            token = token.strip(" ,;:()[]{}'\"")
             if token.endswith(".py") and "/" in token and token not in candidates:
                 candidates.append(token)
+    return candidates
+
+
+def extract_file_path_candidates(items: list[str], max_items: int = 60) -> list[str]:
+    """
+    Extract repo-like file paths from free-form log/test text.
+
+    This is extension-agnostic so workflow/config files (e.g. .yml) are included.
+    """
+    candidates: list[str] = []
+    pattern = re.compile(r"(?:^|[\s'\"(])([./A-Za-z0-9_-]+(?:/[A-Za-z0-9_.-]+)+)")
+
+    for item in items:
+        normalized = item.replace("\\", "/")
+        for match in pattern.finditer(normalized):
+            token = match.group(1).strip(" ,;:()[]{}'\"")
+            if token.startswith("./"):
+                token = token[2:]
+            if not token or "/" not in token:
+                continue
+            if token not in candidates:
+                candidates.append(token)
+            if len(candidates) >= max_items:
+                return candidates
     return candidates
 

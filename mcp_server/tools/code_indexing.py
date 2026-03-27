@@ -71,7 +71,17 @@ def sanitize_query_text(
         safe = (query_text or "").strip()[:max_chars]
         return safe, 0
 
-    capped_tokens = all_tokens[:max_tokens]
+    # Preserve order but remove duplicates to avoid noisy queries like:
+    # "failure failure summary summary ...".
+    unique_tokens: list[str] = []
+    seen: set[str] = set()
+    for token in all_tokens:
+        if token in seen:
+            continue
+        seen.add(token)
+        unique_tokens.append(token)
+
+    capped_tokens = unique_tokens[:max_tokens]
     safe = " ".join(capped_tokens)
     if len(safe) > max_chars:
         safe = safe[:max_chars]
@@ -160,6 +170,23 @@ def render_retrieval_context(results: list[dict[str, Any]], max_snippets: int = 
     return "\n".join(lines).strip()
 
 
+def _build_result_previews(results: list[dict[str, Any]], max_items: int = 3) -> list[dict[str, Any]]:
+    previews: list[dict[str, Any]] = []
+    for item in results[:max_items]:
+        line_range = item.get("line_range") or item.get("lineRange") or [0, 0]
+        snippet = (item.get("snippet") or "").strip().replace("\n", "\\n")
+        if len(snippet) > 220:
+            snippet = snippet[:220] + "..."
+        previews.append(
+            {
+                "file_path": item.get("file_path") or item.get("file_rel_path") or "<unknown>",
+                "line_range": line_range,
+                "snippet_preview": snippet,
+            }
+        )
+    return previews
+
+
 def build_and_query(
     file_contents: dict[str, str],
     query_text: str,
@@ -222,6 +249,7 @@ def build_and_query(
         rendered = render_retrieval_context(results=results)
         debug = {
             "enabled": True,
+            "query_preview": safe_query[:300],
             "token_count": token_count,
             "max_query_tokens": max_query_tokens,
             "max_query_chars": max_query_chars,
@@ -230,6 +258,8 @@ def build_and_query(
             "fallback_used": fallback_used,
             "final_skip_symbol": final_skip_symbol,
             "results_count": len(results),
+            "result_previews": _build_result_previews(results),
+            "rendered_context_preview": (rendered[:600] + "...") if len(rendered) > 600 else rendered,
         }
         return rendered, len(results), debug
 

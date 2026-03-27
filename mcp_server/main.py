@@ -5,11 +5,16 @@ from typing import Any
 from fastmcp import FastMCP
 
 from mcp_server.config import get_settings
-from mcp_server.tools.diagnose import diagnose_failure, generate_patch_with_llm
+from mcp_server.tools.diagnose import (
+    diagnose_failure,
+    generate_patch_with_llm,
+    generate_retrieval_query_with_llm,
+)
 from mcp_server.tools.fix_generator import build_fix_proposal_from_patch
 from mcp_server.tools.github_client import GitHubClient
 from mcp_server.tools.code_indexing import build_and_query
 from mcp_server.tools.logs_analyzer import (
+    extract_file_path_candidates,
     extract_failing_tests,
     extract_python_file_candidates,
     normalize_logs,
@@ -88,21 +93,21 @@ async def orchestrate_autofix(
     diagnosis_model = DiagnosisResult.model_validate(analysis["diagnosis"])
 
     # Fetch candidate file contents at the failing commit SHA.
-    candidates = [p for p in context.changed_files if p.endswith(".py")]
-    candidates.extend(extract_python_file_candidates(context.failing_tests))
-    if ("no module named 'app'" in context.logs_excerpt.lower()) and ("app.py" not in candidates):
-        candidates.append("app.py")
-    if "tests/test_app.py" not in candidates:
-        candidates.append("tests/test_app.py")
+    # Keep this extension-agnostic to support workflow/config failures too.
+    candidates: list[str] = []
+    for p in context.changed_files:
+        if p and p not in candidates:
+            candidates.append(p)
 
-    prioritized: list[str] = []
-    for p in ["app.py", "tests/test_app.py", "test_app.py"]:
-        if p in candidates and p not in prioritized:
-            prioritized.append(p)
-    for p in candidates:
-        if p not in prioritized:
-            prioritized.append(p)
-    candidates = prioritized
+    extracted = extract_file_path_candidates(context.failing_tests + [context.logs_excerpt], max_items=80)
+    for p in extracted:
+        if p not in candidates:
+            candidates.append(p)
+
+    # Backward-compatible signal for Python-heavy failures.
+    for p in extract_python_file_candidates(context.failing_tests):
+        if p not in candidates:
+            candidates.append(p)
 
     file_contents: dict[str, str] = {}
     for path in candidates[: settings.MAX_AUTOFIX_FILES + 2]:
@@ -113,12 +118,27 @@ async def orchestrate_autofix(
     retrieval_context = "Indexing disabled."
     retrieval_snippet_count = 0
     if settings.INDEXING_ENABLED:
-        query_text = (
+        fallback_query = (
             f"Failure summary: {diagnosis_model.summary}\n"
             f"Root cause: {diagnosis_model.root_cause}\n"
             f"Failing tests: {context.failing_tests}\n"
             f"Logs excerpt:\n{context.logs_excerpt[:4000]}"
         )
+        query_text = fallback_query
+        query_source = "fallback"
+        try:
+            llm_query = await generate_retrieval_query_with_llm(
+                settings=settings,
+                context=context,
+                diagnosis=diagnosis_model,
+                candidate_paths=candidates,
+            )
+            if llm_query:
+                query_text = llm_query
+                query_source = "llm"
+        except Exception:
+            query_source = "fallback"
+
         retrieval_context, retrieval_snippet_count, indexing_debug = build_and_query(
             file_contents=file_contents,
             query_text=query_text,
@@ -128,6 +148,7 @@ async def orchestrate_autofix(
             max_query_tokens=settings.INDEXING_MAX_QUERY_TOKENS,
             skip_symbol_token_threshold=settings.INDEXING_SKIP_SYMBOL_TOKEN_THRESHOLD,
         )
+        indexing_debug["query_source"] = query_source
     else:
         indexing_debug = {"enabled": False}
 
@@ -184,6 +205,7 @@ async def orchestrate_autofix(
             "status": "failed_after_retries",
             "reason": "Could not generate/apply a valid patch within retry limit.",
             "analysis": analysis,
+            "indexing_debug": indexing_debug,
             "attempts": [a.model_dump() for a in attempt_logs],
         }
 

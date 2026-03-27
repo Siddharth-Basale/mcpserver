@@ -27,6 +27,17 @@ Rules:
 - Prefer using the relevant line-grounded context below when selecting exact lines for patch hunks.
 """
 
+RETRIEVAL_QUERY_PROMPT = """You generate one high-signal code search query for retrieval.
+Return strict JSON with key:
+- query
+
+Rules:
+- Query must target files that likely need editing for the failure.
+- Include concrete file/path hints when relevant (e.g., .github/workflows/ci.yml, requirements.txt, pyproject.toml).
+- Keep it concise and specific for lexical/symbol search (single line).
+- Do not include markdown fences or extra keys.
+"""
+
 
 async def diagnose_failure(settings: Settings, context: PipelineContext) -> DiagnosisResult:
     payload = {
@@ -137,4 +148,54 @@ async def generate_patch_with_llm(
     if len(result.patch) > settings.LLM_PATCH_MAX_CHARS:
         result.patch = result.patch[: settings.LLM_PATCH_MAX_CHARS]
     return result
+
+
+async def generate_retrieval_query_with_llm(
+    settings: Settings,
+    context: PipelineContext,
+    diagnosis: DiagnosisResult,
+    candidate_paths: list[str],
+) -> str:
+    payload = {
+        "model": settings.OPENAI_MODEL,
+        "input": [
+            {"role": "system", "content": [{"type": "input_text", "text": RETRIEVAL_QUERY_PROMPT}]},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": (
+                            f"Repository: {context.repository}\n"
+                            f"Run ID: {context.run_id}\n"
+                            f"Diagnosis summary: {diagnosis.summary}\n"
+                            f"Root cause: {diagnosis.root_cause}\n"
+                            f"Failing tests: {context.failing_tests}\n"
+                            f"Changed files: {context.changed_files}\n"
+                            f"Candidate files: {candidate_paths}\n"
+                            f"Logs excerpt:\n{context.logs_excerpt[:2500]}"
+                        ),
+                    }
+                ],
+            },
+        ],
+        "text": {"format": {"type": "json_object"}},
+    }
+    headers = {
+        "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/responses",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    raw_text = _extract_text_output(data)
+    parsed = json.loads(raw_text)
+    query = str(parsed.get("query", "")).strip()
+    return query
 
