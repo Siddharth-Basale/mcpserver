@@ -65,6 +65,22 @@ async def inspect_pipeline_failure(repository: str, run_id: int) -> dict[str, An
 
 
 @mcp.tool()
+async def resolve_latest_failed_run(repository: str, workflow_name: str = "") -> dict[str, Any]:
+    """Find the latest failed GitHub Actions run for a repository (optional workflow name filter)."""
+    settings = get_settings()
+    github = GitHubClient(settings.GITHUB_TOKEN)
+    run_id = await github.get_latest_failed_run_id(repository=repository, workflow_name=workflow_name)
+    if not run_id:
+        msg = (
+            f"No failed runs found for workflow '{workflow_name}' in {repository}."
+            if workflow_name.strip()
+            else f"No failed runs found in {repository}."
+        )
+        return {"found": False, "run_id": None, "repository": repository, "message": msg}
+    return {"found": True, "run_id": run_id, "repository": repository, "workflow_name": workflow_name or None}
+
+
+@mcp.tool()
 async def orchestrate_autofix(
     repository: str,
     run_id: int,

@@ -13,7 +13,9 @@ Python MCP server for GitHub Actions failure diagnosis, LLM-driven unified-diff 
 ## Project layout
 
 - `mcp_server/main.py` - MCP tools and orchestration entrypoints
+- `mcp_server/host_http.py` - streamable HTTP MCP server for browser clients
 - `mcp_server/run_repair.py` - workflow-safe command runner
+- `frontend/` - Vite + React MCP client UI
 - `mcp_server/config.py` - typed environment config
 - `mcp_server/tools/*` - GitHub, diagnosis, risk, and PR automation modules
 - `.github/workflows/*` - CI/CD automation workflows
@@ -29,7 +31,33 @@ Python MCP server for GitHub Actions failure diagnosis, LLM-driven unified-diff 
 
 ## Run MCP server locally
 
-- `python -m mcp_server.main`
+- **stdio (Cursor / Claude Desktop):** `python -m mcp_server.main`
+
+## Web UI (browser MCP client + hosted server)
+
+The `frontend` app is a real MCP client using streamable HTTP. Secrets stay on the server; the browser only talks MCP.
+
+1. **Terminal A — MCP over HTTP** (from repo root, with `.env` configured):
+
+   ```bash
+   python -m mcp_server.host_http
+   ```
+
+   Defaults: `http://127.0.0.1:8000/mcp`. Override with `MCP_HOST`, `MCP_PORT`.
+
+2. **Terminal B — SPA dev server:**
+
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. Open the Vite URL (usually `http://localhost:5173`). Leave the MCP URL field empty to use the dev proxy (`/mcp` → `127.0.0.1:8000`), or set the full endpoint (for example `http://127.0.0.1:8000/mcp`).
+
+**Production CORS:** set `MCP_CORS_ORIGINS` to a comma-separated list of allowed browser origins (for example `https://app.example.com`). The default includes `http://localhost:5173` and `http://127.0.0.1:5173` for local development.
+
+**MCP tools exposed:** `resolve_latest_failed_run`, `inspect_pipeline_failure`, `orchestrate_autofix` (same behavior as the CLI, with `resolve_latest_failed_run` matching `run_repair` when `RUN_ID` is omitted).
 
 ## Use in Cursor as MCP
 
@@ -41,6 +69,7 @@ Python MCP server for GitHub Actions failure diagnosis, LLM-driven unified-diff 
   - `run_id`: workflow run id (integer)
 - Main tools:
   - `inspect_pipeline_failure`
+  - `resolve_latest_failed_run`
   - `orchestrate_autofix`
 
 ## Run repair orchestration manually
