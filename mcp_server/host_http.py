@@ -20,13 +20,21 @@ def _cors_origins() -> list[str]:
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
+def _cors_origin_regex() -> str | None:
+    """Optional regex (e.g. https://.*\\.onrender\\.com) so SPA origins need not be listed one-by-one."""
+    r = os.getenv("MCP_CORS_ORIGIN_REGEX", "").strip()
+    return r or None
+
+
 def main() -> None:
     load_dotenv()
     origins = _cors_origins()
+    origin_regex = _cors_origin_regex()
     middleware = [
         Middleware(
             CORSMiddleware,
             allow_origins=origins,
+            allow_origin_regex=origin_regex,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],

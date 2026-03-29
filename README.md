@@ -43,7 +43,7 @@ The `frontend` app is a real MCP client using streamable HTTP. Secrets stay on t
    python -m mcp_server.host_http
    ```
 
-   Defaults: `http://127.0.0.1:8000/mcp`. Override with `MCP_HOST`, `MCP_PORT`.
+   Listens on `0.0.0.0` and **`PORT`** from the environment (Render sets this). Path: `/mcp`.
 
 2. **Terminal B — SPA dev server:**
 
@@ -58,7 +58,14 @@ The `frontend` app is a real MCP client using streamable HTTP. Secrets stay on t
 
 3. Open the Vite URL (usually `http://localhost:5173`).
 
-**Production CORS:** set `MCP_CORS_ORIGINS` to a comma-separated list of allowed browser origins (for example `https://app.example.com`). The default includes `http://localhost:5173` and `http://127.0.0.1:5173` for local development.
+**Production CORS:** the browser sends an `Origin` header; the MCP server must allow it or preflight (`OPTIONS`) fails (often surfaced as **Failed to fetch**).
+
+- Set **`MCP_CORS_ORIGINS`** to a comma-separated list of **exact** SPA origins (for example `https://your-frontend.onrender.com`).
+- Or set **`MCP_CORS_ORIGIN_REGEX`** (for example `https://.*\.onrender\.com`) to allow all Render app URLs without listing each one (tighter regex is better for production).
+
+**Render (two services):** one Web Service should run **`python -m mcp_server.host_http`** (the MCP API). A second service or Static Site can serve the built SPA (`npm run build` output). Set **`VITE_MCP_URL`** at **frontend build time** to the **MCP service URL** (for example `https://your-mcp-api.onrender.com/mcp`), not the static site URL, unless you use a reverse proxy that mounts both. If you only run **`vite preview`** on Render, that process does **not** expose the Python MCP server — `/mcp` will not work there.
+
+**GET /mcp → 406** in logs usually means something opened `/mcp` in a normal browser tab (wrong `Accept` header); the MCP client uses POST/SSE and is unaffected.
 
 **MCP tools exposed:** `resolve_latest_failed_run`, `inspect_pipeline_failure`, `orchestrate_autofix` (same behavior as the CLI, with `resolve_latest_failed_run` matching `run_repair` when `RUN_ID` is omitted).
 
