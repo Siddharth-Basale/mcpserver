@@ -12,12 +12,20 @@ from starlette.middleware.cors import CORSMiddleware
 from mcp_server.main import mcp
 
 
+def _normalize_origin(origin: str) -> str:
+    """Browsers send Origin without a trailing slash; strip whitespace and trailing '/'."""
+    o = origin.strip()
+    while len(o) > 1 and o.endswith("/"):
+        o = o[:-1]
+    return o
+
+
 def _cors_origins() -> list[str]:
     raw = os.getenv(
         "MCP_CORS_ORIGINS",
         "http://localhost:5173,http://127.0.0.1:5173",
     )
-    return [x.strip() for x in raw.split(",") if x.strip()]
+    return [_normalize_origin(x) for x in raw.split(",") if x.strip()]
 
 
 def _cors_origin_regex() -> str | None:
