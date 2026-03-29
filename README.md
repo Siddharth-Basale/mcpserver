@@ -50,10 +50,13 @@ The `frontend` app is a real MCP client using streamable HTTP. Secrets stay on t
    ```bash
    cd frontend
    npm install
+   cp .env.example .env
    npm run dev
    ```
 
-3. Open the Vite URL (usually `http://localhost:5173`). Leave the MCP URL field empty to use the dev proxy (`/mcp` → `127.0.0.1:8000`), or set the full endpoint (for example `http://127.0.0.1:8000/mcp`).
+   Configure `frontend/.env`: **`VITE_MCP_URL`** is the MCP endpoint (default `http://127.0.0.1:8000/mcp`). It pre-fills the UI and sets the Vite dev proxy target origin. Clear the field to use same-origin `/mcp` (proxied to that origin).
+
+3. Open the Vite URL (usually `http://localhost:5173`).
 
 **Production CORS:** set `MCP_CORS_ORIGINS` to a comma-separated list of allowed browser origins (for example `https://app.example.com`). The default includes `http://localhost:5173` and `http://127.0.0.1:5173` for local development.
 

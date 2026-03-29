@@ -69,9 +69,11 @@ const REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/
 const RESOLVE_TIMEOUT_MS = Number(import.meta.env.VITE_MCP_RESOLVE_TIMEOUT_MS) || 120_000
 const ORCHESTRATE_TIMEOUT_MS = Number(import.meta.env.VITE_MCP_ORCHESTRATE_TIMEOUT_MS) || 900_000
 
+const defaultMcpUrlFromEnv = import.meta.env.VITE_MCP_URL?.trim() ?? ''
+
 export default function App() {
   const [conn, setConn] = useState<ConnState>('disconnected')
-  const [mcpUrlInput, setMcpUrlInput] = useState('')
+  const [mcpUrlInput, setMcpUrlInput] = useState(defaultMcpUrlFromEnv)
   const [client, setClient] = useState<Client | null>(null)
   const [transport, setTransport] = useState<StreamableHTTPClientTransport | null>(null)
   const [tools, setTools] = useState<Tool[]>([])
