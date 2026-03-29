@@ -16,15 +16,24 @@ function mcpProxyTarget(env: Record<string, string>): string {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+
   return {
     plugins: [react(), tailwindcss()],
+
     server: {
+      host: true,
       proxy: {
         '/mcp': {
           target: mcpProxyTarget(env),
           changeOrigin: true,
         },
       },
+    },
+
+    preview: {
+      host: true,
+      allowedHosts: 'all',
+      port: Number(process.env.PORT) || 5173,
     },
   }
 })
