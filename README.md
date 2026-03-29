@@ -59,6 +59,8 @@ The `frontend` app is a real MCP client using streamable HTTP. Secrets stay on t
 
 **MCP tools exposed:** `resolve_latest_failed_run`, `inspect_pipeline_failure`, `orchestrate_autofix` (same behavior as the CLI, with `resolve_latest_failed_run` matching `run_repair` when `RUN_ID` is omitted).
 
+**Client timeouts:** The MCP TypeScript SDK defaults to **60 seconds** per request. `orchestrate_autofix` often runs longer (LLMs, GitHub). The SPA uses **15 minutes** for `orchestrate_autofix` and **2 minutes** for `resolve_latest_failed_run` unless you set `VITE_MCP_ORCHESTRATE_TIMEOUT_MS` / `VITE_MCP_RESOLVE_TIMEOUT_MS` in `frontend/.env` (milliseconds).
+
 ## Use in Cursor as MCP
 
 - MCP config is included at `.cursor/mcp.json`.

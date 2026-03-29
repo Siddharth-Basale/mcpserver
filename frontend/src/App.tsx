@@ -65,6 +65,10 @@ function deepFindHtmlUrl(obj: unknown, depth = 0): string | undefined {
 
 const REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/
 
+/** MCP SDK defaults to 60s per request; orchestrate_autofix often needs minutes (LLM + GitHub). */
+const RESOLVE_TIMEOUT_MS = Number(import.meta.env.VITE_MCP_RESOLVE_TIMEOUT_MS) || 120_000
+const ORCHESTRATE_TIMEOUT_MS = Number(import.meta.env.VITE_MCP_ORCHESTRATE_TIMEOUT_MS) || 900_000
+
 export default function App() {
   const [conn, setConn] = useState<ConnState>('disconnected')
   const [mcpUrlInput, setMcpUrlInput] = useState('')
@@ -181,7 +185,11 @@ export default function App() {
           startedAt: Date.now(),
           status: 'running',
         })
-        const raw = await client.callTool({ name: 'resolve_latest_failed_run', arguments: args })
+        const raw = await client.callTool(
+          { name: 'resolve_latest_failed_run', arguments: args },
+          undefined,
+          { timeout: RESOLVE_TIMEOUT_MS },
+        )
         const parsed = parseToolResult(raw) as Record<string, unknown>
         const ended = Date.now()
         updateTimeline(id, {
@@ -210,7 +218,11 @@ export default function App() {
         startedAt: Date.now(),
         status: 'running',
       })
-      const raw2 = await client.callTool({ name: 'orchestrate_autofix', arguments: args2 })
+      const raw2 = await client.callTool(
+        { name: 'orchestrate_autofix', arguments: args2 },
+        undefined,
+        { timeout: ORCHESTRATE_TIMEOUT_MS },
+      )
       const parsed2 = parseToolResult(raw2)
       updateTimeline(id2, {
         status: 'ok',
