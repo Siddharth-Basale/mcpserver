@@ -33,8 +33,8 @@ def main() -> None:
             expose_headers=["*"],
         ),
     ]
-    host = os.getenv("MCP_HOST", "127.0.0.1").strip() or "127.0.0.1"
-    port = int(os.getenv("MCP_PORT", "8000"))
+    host = "0.0.0.0"
+    port = int(os.environ.get("PORT", 8000))
 
     asyncio.run(
         mcp.run_http_async(
