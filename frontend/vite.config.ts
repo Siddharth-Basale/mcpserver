@@ -13,7 +13,6 @@ function mcpProxyTarget(env: Record<string, string>): string {
   }
 }
 
-// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
@@ -32,7 +31,7 @@ export default defineConfig(({ mode }) => {
 
     preview: {
       host: true,
-      allowedHosts: 'all',
+      allowedHosts: true,
       port: Number(process.env.PORT) || 5173,
     },
   }
